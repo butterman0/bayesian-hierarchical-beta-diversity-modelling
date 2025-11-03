@@ -1,33 +1,36 @@
 # Bayesian Hierarchical Beta Diversity Modelling
 
-A compact, public landing page for the Bayesian Hierarchical Beta Diversity Modelling project (spGDMM-related).
+A Python package for modelling **beta diversity** using **Generalised Dissimilarity Modelling** ([GDM](https://onlinelibrary.wiley.com/doi/full/10.1111/geb.13459)) and its **hierarchical Bayesian extension** ([spGDMM](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.14259)).
 
-## Purpose
-This repository provides a minimal public snapshot describing an experimental Python implementation of hierarchical models for beta diversity (e.g., spatial generalized Dirichlet-multinomial and related approaches). It is intended as a safe, pinnable landing page that points to research goals, roadmap, and contribution guidelines without exposing private experimental artifacts.
+This repository currently serves as a placeholder for the research code underpinning my work on **plankton beta-diversity modelling**.  
 
-This public repo contains:
-- A short README describing the project's purpose
-- A roadmap outlining planned work and milestones
-- Contribution guidelines and templates to make community collaboration easier
-- A permissive MIT license
+A **fully documented, user-friendly release** is planned for **late 2025 / early 2026**.
 
-> Note: This public landing repo is intentionally minimal. Full code, notebooks, and experimental data may remain in private repositories.
+## What is this?
+
+This package forms the core of my PhD research in quantitative marine ecology, focused on modelling beta diversity from **environmental** and **eDNA** data.  
+
+It implements and extends GDM within a **hierarchical Bayesian framework (spGDMM)** to capture spatial structure, uncertainty, and compositional relationships in biodiversity data.
+
+The project integrates:
+
+- **Quantitative methods** – hierarchical Bayesian inference, spatial Gaussian processes, and spline-based dissimilarity modelling  
+- **Scientific Python tools** – `xarray`, `pandas`, `numpy`, `scikit-learn`, `pymc`, `matplotlib`  
+- **Geospatial and environmental data** – large-scale marine datasets from ocean models, satellites, and in-situ sampling  
+- **Reproducible code** – modular, well-documented code using `git`
+
+## Planned features
+
+- GDM and spGDMM models with a consistent, scikit-learn-like API  
+- Spatial and compositional preprocessing utilities  
+- Model evaluation and uncertainty summaries  
+- Visualisation tools for dissimilarity, residuals, and spatial effects  
 
 ## Status
-Early-stage / research prototype — components and APIs may change. See ROADMAP.md for planned milestones.
 
-## Highlights
-- Reference implementation planned for core hierarchical beta-diversity components
-- Example notebooks and small datasets are planned
-- Focus on reproducibility and small, easy-to-review contributions
+**Pre-release / research-only.**  
+Interfaces and structure are under active development.
 
-## Links
-- Roadmap: ROADMAP.md
-- Contributing: CONTRIBUTING.md
-- Code of Conduct: CODE_OF_CONDUCT.md
-- License: LICENSE
-- Issue templates: .github/ISSUE_TEMPLATE/
+If you're interested, please get in touch! 
 
-## Contact
-Maintainer: @butterman0  
-For questions or to propose collaborations, please open an issue (use the appropriate template).
+Email: harold.horsley@ntnu.no
