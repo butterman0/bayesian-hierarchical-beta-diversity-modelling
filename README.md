@@ -4,7 +4,7 @@ A Python package for modelling **beta diversity** using **Generalised Dissimilar
 
 This repository currently serves as a placeholder for the research code underpinning my work on **plankton beta-diversity modelling**.  
 
-A **fully documented, user-friendly release** is planned for **late 2025 / early 2026**.
+A **fully documented, user-friendly release** is planned for **mid 2026**.
 
 ## What is this?
 
