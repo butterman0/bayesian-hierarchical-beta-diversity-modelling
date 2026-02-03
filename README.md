@@ -8,7 +8,7 @@ A **fully documented, user-friendly release** is planned for **mid 2026**.
 
 ## What is this?
 
-This package forms the core of my PhD research in quantitative marine ecology, focused on modelling beta diversity from **environmental** and **eDNA** data.  
+This package forms part of my PhD research in quantitative marine ecology, focused on modelling beta diversity from **environmental** and **eDNA** data.  
 
 It implements and extends GDM within a **hierarchical Bayesian framework (spGDMM)** to capture spatial structure, uncertainty, and compositional relationships in biodiversity data.
 
