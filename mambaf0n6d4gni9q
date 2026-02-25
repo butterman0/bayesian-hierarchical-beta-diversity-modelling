@@ -1,0 +1,5 @@
+dms-variants>=0.8
+ISLP>=0.3
+json-tricks>=3.16
+properscoring>=0.1
+-e ./spgdmm

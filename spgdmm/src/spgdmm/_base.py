@@ -23,7 +23,7 @@ from typing import Any
 
 import arviz as az
 import numpy as np
-import fireducks.pandas as pd
+import pandas as pd
 import pymc as pm
 import xarray as xr
 

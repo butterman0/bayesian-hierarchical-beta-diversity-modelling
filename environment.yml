@@ -21,5 +21,4 @@ dependencies:
       - ISLP>=0.3
       - json-tricks>=3.16
       - properscoring>=0.1
-      - fireducks
-      - -e .
+      - -e ./spgdmm
