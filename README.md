@@ -16,8 +16,19 @@ mamba activate spgdmm-demo
 jupyter lab demo.ipynb
 ```
 
+## Based on
+
+### Original model implementation in R:
+
+White, P.A., Frye, H.A., Slingsby, J.A., Silander, J.A. & Gelfand, A.E. (2024). Generative spatial generalized dissimilarity mixed modelling (spGDMM): An enhanced approach to modelling beta diversity. *Methods in Ecology and Evolution*, 15(1), 214–226. https://doi.org/10.1111/2041-210X.14259
+
+### 
+
+Abril-Pla, O. et al. (2023). PyMC: A modern and comprehensive probabilistic programming framework in Python. *PeerJ Computer Science*, 9, e1516. https://doi.org/10.7717/peerj-cs.1516
+
 ## Contact
 
 If any of this is interesting (or not), please let me know!
 
 harold.horsley@ntnu.no
+
