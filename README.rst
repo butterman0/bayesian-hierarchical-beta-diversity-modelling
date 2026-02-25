@@ -1,40 +1,27 @@
 Bayesian Hierarchical Beta Diversity Modelling
 ==============================================
 
-|status|
-
 **Demo release** — full package coming in 2026.
 
 Python code for modelling beta diversity with
-`Generalized Dissimilarity Modelling (GDM) <https://onlinelibrary.wiley.com/doi/full/10.1111/geb.13459>`_
-and its hierarchical Bayesian extension
+`GDM <https://onlinelibrary.wiley.com/doi/full/10.1111/geb.13459>`_
+and its hierarchical Bayesian extension,
 `spGDMM <https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.14259>`_.
-
-This repository forms part of PhD research on plankton beta-diversity
-modelling from environmental and eDNA data.
+Part of my PhD research on plankton beta-diversity modelling from environmental and eDNA data.
 
 
-Overview
---------
+Demo
+----
 
-The demo notebook (``demo.ipynb``) fits **spGDMM** to plankton community data
-(temperature, salinity, and vorticity → five plankton groups)
-derived from the SINMOD ocean model at 80 spatial sites.
+``demo.ipynb`` fits spGDMM to plankton community data
+(temperature, salinity, vorticity → 5 plankton groups)
+from the SINMOD ocean model at 80 sites.
 
-The workflow demonstrates:
+It covers model fitting, convergence diagnostics,
+predictive scoring (CRPS), community mapping,
+and I-spline response curves.
 
-- Model specification
-- Bayesian inference
-- Convergence diagnostics
-- Predictive scoring (CRPS)
-- Community turnover mapping
-- I-spline response curves
-
-
-Installation
-------------
-
-From the repository root:
+**Setup** (from repo root):
 
 .. code-block:: bash
 
@@ -43,43 +30,31 @@ From the repository root:
    jupyter lab demo.ipynb
 
 
-Scientific Background
----------------------
+Based on
+--------
 
-Original model implementation in R:
+Original model implementation in R
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 White, P.A., Frye, H.A., Slingsby, J.A., Silander, J.A. & Gelfand, A.E. (2024).
-*Generative spatial generalized dissimilarity mixed modelling (spGDMM):
-An enhanced approach to modelling beta diversity.*
-Methods in Ecology and Evolution, 15(1), 214–226.
+Generative spatial generalized dissimilarity mixed modelling (spGDMM):
+An enhanced approach to modelling beta diversity.
+*Methods in Ecology and Evolution*, 15(1), 214–226.
 https://doi.org/10.1111/2041-210X.14259
 
 
-Citation
---------
+Bayesian inference framework
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you use this code in academic work, please cite the spGDMM paper above.
-A formal package citation file (``CITATION.cff``) will be added with the full release.
-
-
-Project Status
---------------
-
-This repository currently provides:
-
-- A working demonstration notebook
-- A reproducible modelling environment
-- A research prototype implementation
-
-The full software package and documentation are planned for release in 2026.
+Abril-Pla, O. et al. (2023).
+PyMC: A modern and comprehensive probabilistic programming framework in Python.
+*PeerJ Computer Science*, 9, e1516.
+https://doi.org/10.7717/peerj-cs.1516
 
 
 Contact
 -------
 
-Harold Horsley  
-NTNU  
+If any of this is interesting (or not), please let me know!
+
 harold.horsley@ntnu.no
-
-
-.. |status| image:: https://img.shields.io/badge/status-demo--release-orange
