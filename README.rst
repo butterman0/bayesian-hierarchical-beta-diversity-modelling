@@ -3,23 +3,25 @@ Bayesian Hierarchical Beta Diversity Modelling
 
 **Demo release** — full package coming in 2026.
 
-Python code for modelling beta diversity with
+Python code for modelling beta diversity in the style of 
 `GDM <https://onlinelibrary.wiley.com/doi/full/10.1111/geb.13459>`_
-and its hierarchical Bayesian extension,
+using its hierarchical Bayesian extension,
 `spGDMM <https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.14259>`_.
-Part of my PhD research on plankton beta-diversity modelling from environmental and eDNA data.
-
 
 Demo
 ----
 
 ``demo.ipynb`` fits spGDMM to plankton community data
 (temperature, salinity, vorticity → 5 plankton groups)
-from the SINMOD ocean model at 80 sites.
+from the SINMOD ocean model, using **50 training sites** and **100 test sites**
+on day 105 (15 April 2019).
 
 It covers model fitting, convergence diagnostics,
 predictive scoring (CRPS), community mapping,
 and I-spline response curves.
+
+The pre-processed dataset (``demo_data/day105_publication.npz``) is included —
+no data pipeline dependency is needed to run the notebook.
 
 **Setup** (from repo root):
 
@@ -48,9 +50,7 @@ Bayesian inference framework
 Contact
 -------
 
-If any of this is interesting (or not), please let me know!
-
-harold.horsley@ntnu.no
+Anonymous
 
 
 .. |spgdmm_doi| image:: https://img.shields.io/badge/DOI-10.1111%2F2041--210X.14259-blue.svg
