@@ -3,6 +3,7 @@ Plotting utilities for fitted spGDMM models.
 """
 
 import numpy as np
+import pandas as pd
 import arviz as az
 import matplotlib.pyplot as plt
 from dms_variants.ispline import Isplines
@@ -191,3 +192,255 @@ def plot_crps_comparison(y_test, y_pred, y_train, use_log=False, figsize=(7, 4))
     
     plt.tight_layout()
     return fig, axes
+
+
+# ---------------------------------------------------------------------------
+# Sampling diagnostics
+# ---------------------------------------------------------------------------
+
+def summarise_sampling(idata, var_names=None):
+    """
+    Return a tidy DataFrame of ESS / R-hat diagnostics and print a divergence
+    count.
+
+    Parameters
+    ----------
+    idata : arviz.InferenceData
+        Result of a completed ``model.fit()`` call.
+    var_names : list of str, optional
+        Parameters to include.  Defaults to all variables in the posterior.
+
+    Returns
+    -------
+    diag : pandas.DataFrame
+        Columns: ``mean``, ``sd``, ``ess_bulk``, ``ess_tail``, ``r_hat``.
+        Rows are individual scalar parameters (vectorised parameters are
+        unpacked by ArviZ).
+    """
+    summary = az.summary(idata, var_names=var_names)
+    keep = [c for c in ["mean", "sd", "ess_bulk", "ess_tail", "r_hat"]
+            if c in summary.columns]
+    diag = summary[keep].copy()
+
+    # Divergence count from sample_stats
+    n_div = 0
+    if hasattr(idata, "sample_stats") and hasattr(idata.sample_stats, "diverging"):
+        n_div = int(idata.sample_stats.diverging.values.sum())
+
+    n_chains = idata.posterior.dims.get("chain", 1)
+    n_draws  = idata.posterior.dims.get("draw", 0)
+    total    = n_chains * n_draws
+
+    print(f"Chains: {n_chains}  |  Draws/chain: {n_draws}  |  "
+          f"Total draws: {total}  |  Divergences: {n_div}")
+
+    # Flag problematic rows
+    bad_rhat = diag["r_hat"] > 1.01 if "r_hat" in diag else pd.Series(dtype=bool)
+    bad_ess  = diag["ess_bulk"] < 100 if "ess_bulk" in diag else pd.Series(dtype=bool)
+    n_bad_rhat = bad_rhat.sum()
+    n_bad_ess  = bad_ess.sum()
+    if n_bad_rhat:
+        print(f"  WARNING: {n_bad_rhat} parameter(s) with R-hat > 1.01")
+    if n_bad_ess:
+        print(f"  WARNING: {n_bad_ess} parameter(s) with ESS_bulk < 100")
+    if not n_bad_rhat and not n_bad_ess and n_div == 0:
+        print("  All diagnostics look healthy.")
+
+    return diag
+
+
+def plot_ppc(idata, y_obs, n_pp_samples=200, figsize=(6, 4)):
+    """
+    Posterior predictive check: observed log-dissimilarity distribution vs
+    posterior predictive draws.
+
+    Overlays ``n_pp_samples`` kernel-density estimates of individual posterior
+    predictive replicates (light blue) against the observed distribution
+    (solid black).  Good model fit is indicated by the observed KDE lying
+    within the cloud of predictive KDEs.
+
+    Parameters
+    ----------
+    idata : arviz.InferenceData
+        Must contain a ``posterior_predictive`` group with variable ``log_y``.
+    y_obs : array-like, shape (n_obs,)
+        Observed Bray-Curtis dissimilarities (original scale, not log).
+    n_pp_samples : int
+        Number of posterior predictive replicates to overlay (default 200).
+    figsize : tuple
+        Figure size.
+
+    Returns
+    -------
+    fig, ax : matplotlib Figure and Axes
+    """
+    from scipy.stats import gaussian_kde
+
+    pp = idata.posterior_predictive["log_y"].values   # (chain, draw, obs)
+    n_chains, n_draws, n_obs = pp.shape
+    pp_flat = pp.reshape(-1, n_obs)                    # (total_draws, obs)
+
+    rng  = np.random.default_rng(0)
+    idx  = rng.choice(pp_flat.shape[0], size=min(n_pp_samples, pp_flat.shape[0]),
+                      replace=False)
+    pp_sel = pp_flat[idx]                              # (n_pp_samples, obs)
+
+    log_y_obs = np.log(np.asarray(y_obs, dtype=float))
+    x_grid    = np.linspace(
+        min(log_y_obs.min(), pp_sel.min()) - 0.3,
+        max(log_y_obs.max(), pp_sel.max()) + 0.3,
+        300,
+    )
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for i, rep in enumerate(pp_sel):
+        kde = gaussian_kde(rep)
+        ax.plot(x_grid, kde(x_grid), color="steelblue", alpha=0.07, lw=0.8,
+                label="Posterior predictive" if i == 0 else None)
+
+    kde_obs = gaussian_kde(log_y_obs)
+    ax.plot(x_grid, kde_obs(x_grid), color="black", lw=2, label="Observed")
+
+    ax.set_xlabel("log(Bray–Curtis dissimilarity)")
+    ax.set_ylabel("Density")
+    ax.set_title("Posterior Predictive Check")
+    ax.legend(fontsize=9)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.tight_layout()
+    return fig, ax
+
+
+# ---------------------------------------------------------------------------
+# Learning-curve (Ntrain sweep)
+# ---------------------------------------------------------------------------
+
+def run_learning_curve(
+    X_train_full,
+    biomass_train_full,
+    X_test,
+    y_test,
+    train_sizes,
+    model_kwargs=None,
+    sampler_config=None,
+    random_seed=0,
+):
+    """
+    Sweep over training-set sizes and record CRPS skill on a fixed test set.
+
+    For each value *N* in ``train_sizes`` the function:
+
+    1. Takes the first *N* rows of ``X_train_full`` / ``biomass_train_full``.
+    2. Computes pairwise Bray-Curtis dissimilarity for those *N* sites.
+    3. Fits a fresh :class:`spGDMM` model.
+    4. Predicts posterior samples for the test set.
+    5. Computes per-pair CRPS skill score (1 − CRPS_model / CRPS_null).
+
+    Parameters
+    ----------
+    X_train_full : pandas.DataFrame, shape (N_max, p)
+        Full training predictor matrix (spatial coords + environmental).
+    biomass_train_full : numpy.ndarray, shape (N_max, n_species)
+        Corresponding biomass matrix used to compute Bray-Curtis response.
+    X_test : pandas.DataFrame, shape (n_test, p)
+        Fixed test predictor matrix.
+    y_test : array-like, shape (n_test*(n_test-1)//2,)
+        Fixed test Bray-Curtis dissimilarities.
+    train_sizes : array-like of int
+        Sequence of training sizes to evaluate, e.g. ``[10, 20, 30, 40, 50, 60]``.
+    model_kwargs : dict, optional
+        Keyword arguments forwarded to :class:`spGDMM` constructor.
+    sampler_config : dict, optional
+        Sampler settings forwarded as ``sampler_config`` to :class:`spGDMM`.
+        Defaults to a fast configuration (200 draws, 200 tune, 2 chains).
+    random_seed : int
+        Base random seed; each sweep replicate uses ``random_seed + i``.
+
+    Returns
+    -------
+    results : pandas.DataFrame
+        Columns: ``train_size``, ``mean_skill``, ``median_skill``,
+        ``q25_skill``, ``q75_skill``, ``mean_crps_model``, ``mean_crps_null``.
+    """
+    from scipy.spatial.distance import pdist
+    from properscoring import crps_ensemble
+    from .model import spGDMM
+
+    if model_kwargs is None:
+        model_kwargs = {}
+    if sampler_config is None:
+        sampler_config = {
+            "draws": 200, "tune": 200, "chains": 2, "target_accept": 0.95
+        }
+
+    y_test = np.asarray(y_test, dtype=float)
+    rows = []
+    for i, n in enumerate(train_sizes):
+        print(f"  [LC] Ntrain={n} ({i+1}/{len(train_sizes)})", flush=True)
+        X_sub  = X_train_full.iloc[:n].copy()
+        bio_sub = biomass_train_full[:n]
+        y_sub  = np.clip(pdist(bio_sub, "braycurtis"), 1e-8, None)
+
+        m = spGDMM(sampler_config=sampler_config, **model_kwargs)
+        m.fit(X_sub, y_sub, random_seed=random_seed + i)
+
+        pp = m.predict_posterior(X_test, extend_idata=False)
+        pp_vals = np.exp(pp.values) if hasattr(pp, "values") else np.exp(pp)
+
+        # Null baseline: training BC as forecast ensemble
+        crps_m = crps_ensemble(y_test, pp_vals)
+        crps_n = crps_ensemble(
+            y_test, np.tile(y_sub, (len(y_test), 1))
+        )
+        skill = 1.0 - crps_m / crps_n
+
+        rows.append({
+            "train_size":      n,
+            "mean_skill":      float(np.mean(skill)),
+            "median_skill":    float(np.median(skill)),
+            "q25_skill":       float(np.percentile(skill, 25)),
+            "q75_skill":       float(np.percentile(skill, 75)),
+            "mean_crps_model": float(np.mean(crps_m)),
+            "mean_crps_null":  float(np.mean(crps_n)),
+        })
+
+    return pd.DataFrame(rows)
+
+
+def plot_learning_curve(lc_results, figsize=(6, 4)):
+    """
+    Plot skill score vs training size, showing asymptotic behaviour.
+
+    Parameters
+    ----------
+    lc_results : pandas.DataFrame
+        Output of :func:`run_learning_curve`.
+    figsize : tuple
+        Figure size.
+
+    Returns
+    -------
+    fig, ax : matplotlib Figure and Axes
+    """
+    df = lc_results.sort_values("train_size")
+    sizes = df["train_size"].values
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax.fill_between(
+        sizes, df["q25_skill"], df["q75_skill"],
+        alpha=0.25, color="steelblue", label="IQR"
+    )
+    ax.plot(sizes, df["median_skill"], "o-", color="steelblue",
+            lw=2, ms=5, label="Median skill")
+    ax.plot(sizes, df["mean_skill"], "s--", color="steelblue",
+            lw=1.2, ms=4, alpha=0.7, label="Mean skill")
+    ax.axhline(0, color="gray", lw=1, linestyle="--", alpha=0.6)
+
+    ax.set_xlabel("Training set size  $N_{\\mathrm{train}}$")
+    ax.set_ylabel("CRPS skill  $(1 - \\mathrm{CRPS} / \\mathrm{CRPS_{null}})$")
+    ax.set_title("Learning Curve")
+    ax.legend(fontsize=9)
+    ax.spines[["top", "right"]].set_visible(False)
+    plt.tight_layout()
+    return fig, ax

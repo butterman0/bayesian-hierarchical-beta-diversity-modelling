@@ -23,6 +23,7 @@ class spGDMM(ModelBuilder):
         knots: int = 2,
         mesh_choice: str = "percentile",
         distance_measure: str = "euclidean",
+        include_distance: bool = True,
         alpha_importance: bool = True,
         custom_predictor_mesh: Optional[np.ndarray] = None,
         custom_dist_mesh: Optional[np.ndarray] = None,
@@ -54,11 +55,13 @@ class spGDMM(ModelBuilder):
             "knots": knots,
             "mesh_choice": mesh_choice,
             "distance_measure": distance_measure,
+            "include_distance": include_distance,
             "alpha_importance": alpha_importance,
             "custom_predictor_mesh": custom_predictor_mesh,
             "custom_dist_mesh": custom_dist_mesh,
         }
         self.metadata = None
+        self.precomputed_pw_distance = None
         super().__init__(**kwargs)
 
     def build_model(self, X, log_y, prediction=False, **kwargs):
@@ -137,6 +140,8 @@ class spGDMM(ModelBuilder):
         }
 
     def pw_distance(self, location_values: np.ndarray) -> np.ndarray:
+        if self.precomputed_pw_distance is not None:
+            return self.precomputed_pw_distance
         return pdist(location_values, metric="euclidean") / 1000
 
     def _transform_for_training(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
@@ -199,22 +204,32 @@ class spGDMM(ModelBuilder):
             for i in range(I_spline_bases.shape[1])
         ]).T
 
-        dist_predictors = np.column_stack([
-            Isplines(self.config["deg"], dist_mesh, pw_distance).I(i)
-            for i in range(1, deg_freedom + 1)
-        ])
-
-        X_GDM = np.column_stack([I_spline_bases_diffs, dist_predictors])
-
-        self.training_metadata = {
-            "I_spline_bases": I_spline_bases,
-            "I_spline_bases_diffs": I_spline_bases_diffs,
-            "dist_predictors": dist_predictors,
-            "pw_distance": pw_distance,
-            "dist_mesh": dist_mesh,
-            "predictor_mesh": predictor_mesh,
-            "location_values_train": location_values,
-        }
+        if self.config.get("include_distance", True):
+            dist_predictors = np.column_stack([
+                Isplines(self.config["deg"], dist_mesh, pw_distance).I(i)
+                for i in range(1, deg_freedom + 1)
+            ])
+            X_GDM = np.column_stack([I_spline_bases_diffs, dist_predictors])
+            self.training_metadata = {
+                "I_spline_bases": I_spline_bases,
+                "I_spline_bases_diffs": I_spline_bases_diffs,
+                "dist_predictors": dist_predictors,
+                "pw_distance": pw_distance,
+                "dist_mesh": dist_mesh,
+                "predictor_mesh": predictor_mesh,
+                "location_values_train": location_values,
+            }
+        else:
+            X_GDM = I_spline_bases_diffs
+            self.training_metadata = {
+                "I_spline_bases": I_spline_bases,
+                "I_spline_bases_diffs": I_spline_bases_diffs,
+                "dist_predictors": None,
+                "pw_distance": None,
+                "dist_mesh": None,
+                "predictor_mesh": predictor_mesh,
+                "location_values_train": location_values,
+            }
 
         print("[spGDMM] _transform_for_training complete.")
         return X_GDM
@@ -235,8 +250,9 @@ class spGDMM(ModelBuilder):
             for col in predictor_names
             for j in range(1, self.config["deg"] + self.config["knots"] + 1)
         ]
-        column_names += [f"Dist_I{j}" for j in range(1, self.config["deg"] + self.config["knots"] + 1)]
-        predictor_names.append("distance")
+        if self.config.get("include_distance", True):
+            column_names += [f"Dist_I{j}" for j in range(1, self.config["deg"] + self.config["knots"] + 1)]
+            predictor_names.append("distance")
 
         self.X = pd.DataFrame(X_GDM, columns=column_names)
         print(f"[spGDMM] Generated X_GDM with shape {X_GDM.shape} and columns: {column_names}")
@@ -299,34 +315,45 @@ class spGDMM(ModelBuilder):
             for i in range(I_spline_bases_full.shape[1])
         ]).T
 
-        pw_distance = self.pw_distance(location_values)
-        pw_distance_clipped = np.clip(
-            pw_distance,
-            self.training_metadata["dist_mesh"][0],
-            self.training_metadata["dist_mesh"][-1],
-        )
-
-        dist_predictors = np.column_stack([
-            Isplines(self.config["deg"], self.training_metadata["dist_mesh"], pw_distance_clipped).I(j)
-            for j in range(1, self.config["deg"] + self.config["knots"] + 1)
-        ])
-
-        X_GDM_pred = np.column_stack([I_spline_bases_diffs, dist_predictors])
-
         no_sites_test = X_values.shape[0]
         row_ind_test, col_ind_test = np.triu_indices(no_sites_test, k=1)
 
-        self.prediction_metadata = {
-            "I_spline_bases": I_spline_bases_full,
-            "I_spline_bases_diffs": I_spline_bases_diffs,
-            "dist_predictors": dist_predictors,
-            "pw_distance": pw_distance,
-            "location_values_test": location_values,
-            "pw_distance_clipped": pw_distance_clipped,
-            "row_ind_test": row_ind_test,
-            "col_ind_test": col_ind_test,
-            "no_sites_test": no_sites_test,
-        }
+        if self.config.get("include_distance", True):
+            pw_distance = self.pw_distance(location_values)
+            pw_distance_clipped = np.clip(
+                pw_distance,
+                self.training_metadata["dist_mesh"][0],
+                self.training_metadata["dist_mesh"][-1],
+            )
+            dist_predictors = np.column_stack([
+                Isplines(self.config["deg"], self.training_metadata["dist_mesh"], pw_distance_clipped).I(j)
+                for j in range(1, self.config["deg"] + self.config["knots"] + 1)
+            ])
+            X_GDM_pred = np.column_stack([I_spline_bases_diffs, dist_predictors])
+            self.prediction_metadata = {
+                "I_spline_bases": I_spline_bases_full,
+                "I_spline_bases_diffs": I_spline_bases_diffs,
+                "dist_predictors": dist_predictors,
+                "pw_distance": pw_distance,
+                "location_values_test": location_values,
+                "pw_distance_clipped": pw_distance_clipped,
+                "row_ind_test": row_ind_test,
+                "col_ind_test": col_ind_test,
+                "no_sites_test": no_sites_test,
+            }
+        else:
+            X_GDM_pred = I_spline_bases_diffs
+            self.prediction_metadata = {
+                "I_spline_bases": I_spline_bases_full,
+                "I_spline_bases_diffs": I_spline_bases_diffs,
+                "dist_predictors": None,
+                "pw_distance": None,
+                "location_values_test": location_values,
+                "pw_distance_clipped": None,
+                "row_ind_test": row_ind_test,
+                "col_ind_test": col_ind_test,
+                "no_sites_test": no_sites_test,
+            }
 
         self.idata.attrs["prediction_metadata"] = jt.dumps(self.prediction_metadata)
         return X_GDM_pred
@@ -337,8 +364,9 @@ class spGDMM(ModelBuilder):
         else:
             beta_posterior_summary = self.idata.posterior.beta.median(dim=["chain", "draw"])
 
-        # Drop spatial distance feature for biological space representation
-        beta_posterior_summary = beta_posterior_summary.drop_sel(feature="distance")
+        # Drop spatial distance feature for biological space representation (if present)
+        if self.config.get("include_distance", True) and "distance" in beta_posterior_summary["feature"].values:
+            beta_posterior_summary = beta_posterior_summary.drop_sel(feature="distance")
 
         X_pred_splined = self._transform_for_prediction(X_pred, biological_space=True)
         X_pred_splined = X_pred_splined.reshape(
